@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import locale
+from streamlit_echarts import st_echarts
 
 # Configurar o locale para o formato de moeda
 locale.setlocale(locale.LC_ALL, 'pt_BR.UTF-8')
@@ -39,3 +40,21 @@ col3.metric("Vendas totais", f"R$ {format_number(vendas_total)}")
 col4.metric("Carros Automaticos", f"{format_number(quantidade_auto)}")
 col5.metric("Carros Manuais", f"{format_number(quantidade_manual)}")
 
+# Vendas por mês
+df["Month"] = df["Date"].dt.month
+sales_by_month = df["Month"].value_counts().sort_index()
+month_order = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro']
+sales_by_month.index = sales_by_month.index.map(lambda x: month_order[x-1])
+
+option = {
+    "xAxis": {
+        "type": "category",
+        "data": sales_by_month.index.tolist(),
+    },
+    "yAxis": {"type": "value"},
+    "series": [{"data": sales_by_month.values.tolist(), "type": "line"}],
+}
+
+st_echarts(
+    options=option, height="400px",
+)
