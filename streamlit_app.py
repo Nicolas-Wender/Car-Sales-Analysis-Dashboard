@@ -58,3 +58,31 @@ option = {
 st_echarts(
     options=option, height="400px",
 )
+
+# Quantidade de vendas por cor do carro
+sales_by_color = df['Color'].value_counts()
+sales_by_color_list = [{"value": value, "name": name} for name, value in sales_by_color.items()]
+
+options = {
+    "tooltip": {"trigger": "item"},
+    "legend": {"orient": "vertical", "left": "left",},
+    "series": [
+        {
+            "name": "Vendas por Cor",
+            "type": "pie",
+            "radius": "50%",
+            "data": sales_by_color_list,
+            "emphasis": {
+                "itemStyle": {
+                    "shadowBlur": 10,
+                    "shadowOffsetX": 0,
+                    "shadowColor": "rgba(0, 0, 0, 0.5)",
+                }
+            },
+        }
+    ],
+}
+
+st_echarts(
+    options=options, height="600px",
+)
