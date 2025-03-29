@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import locale
+import re
 from streamlit_echarts import st_echarts
 
 # Configurar o locale para o formato de moeda
@@ -86,3 +87,58 @@ options = {
 st_echarts(
     options=options, height="600px",
 )
+
+# Vendas de carro por Genero e agrupado por Anual Income
+
+bins = list(range(0, 1000000, 100000)) + [float('inf')]
+labels = [f"{i}-{i+100000}" for i in range(0, 900000, 100000)] + ["900k+"]
+
+df["Income Category"] = pd.cut(df["Annual Income"], bins=bins, labels=labels, right=False)
+
+income_by_gender = df.pivot_table(
+    index="Income Category", 
+    columns="Gender", 
+    aggfunc="size", 
+    fill_value=0, 
+    observed=False
+)
+
+income_by_gender = income_by_gender.assign(Total=income_by_gender.sum(axis=1))
+income_by_gender = income_by_gender.sort_values(by="Total", ascending=True)
+income_by_gender = income_by_gender.drop(columns=["Total"]) 
+
+male_counts = income_by_gender.get("Male", []).tolist()
+female_counts = income_by_gender.get("Female", []).tolist()
+index_income_by_gender = [re.sub(r"(\d{1,3})000", r"\1k", str(label)) for label in income_by_gender.index.tolist()]
+
+options = {
+    "tooltip": {"trigger": "axis", "axisPointer": {"type": "shadow"}},
+    "legend": {
+        "data": ["Male", "Female"]
+    },
+    "grid": {"left": "3%", "right": "4%", "bottom": "3%", "containLabel": True},
+    "xAxis": {"type": "value"},
+    "yAxis": {
+        "type": "category",
+        "data": index_income_by_gender,
+    },
+    "series": [
+        {
+            "name": "Male",
+            "type": "bar",
+            "stack": "total",
+            "label": {"show": True},
+            "emphasis": {"focus": "series"},
+            "data": male_counts,
+        },
+        {
+            "name": "Female",
+            "type": "bar",
+            "stack": "total",
+            "label": {"show": True},
+            "emphasis": {"focus": "series"},
+            "data": female_counts,
+        }
+    ],
+}
+st_echarts(options=options, height="500px")
