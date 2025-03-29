@@ -88,7 +88,7 @@ st_echarts(
     options=options, height="600px",
 )
 
-# Vendas de carro por Genero e agrupado por Anual Income
+# Vendas por Genero e agrupado por Anual Income
 
 bins = list(range(0, 1000000, 100000)) + [float('inf')]
 labels = [f"{i}-{i+100000}" for i in range(0, 900000, 100000)] + ["900k+"]
@@ -141,4 +141,36 @@ options = {
         }
     ],
 }
+st_echarts(options=options, height="500px")
+
+#Total de vendas por empresa
+
+sales_by_company = df.groupby("Company")["Price ($)"].sum().sort_values(ascending=True)
+
+companies_array = sales_by_company.index.tolist()  
+sales_totals_array = sales_by_company.values.tolist()
+
+options = {
+    "tooltip": {"trigger": "axis", "axisPointer": {"type": "shadow"}},
+    "legend": {
+        "data": companies_array
+    },
+    "grid": {"left": "3%", "right": "4%", "bottom": "3%", "containLabel": True},
+    "xAxis": {"type": "value"},
+    "yAxis": {
+        "type": "category",
+        "data": companies_array,
+    },
+    "series": [
+        {
+            "name": "Sales",
+            "type": "bar",
+            "stack": "total",
+            "label": {"show": True},
+            "emphasis": {"focus": "series"},
+            "data": sales_totals_array,
+        }
+    ],
+}
+
 st_echarts(options=options, height="500px")
