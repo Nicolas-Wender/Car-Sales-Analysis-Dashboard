@@ -3,6 +3,9 @@ import pandas as pd
 import locale
 import re
 from streamlit_echarts import st_echarts
+import pydeck as pdk
+from geopy.geocoders import Photon
+from geopy.extra.rate_limiter import RateLimiter
 
 # Configurar o locale para o formato de moeda
 locale.setlocale(locale.LC_ALL, 'pt_BR.UTF-8')
@@ -10,16 +13,46 @@ locale.setlocale(locale.LC_ALL, 'pt_BR.UTF-8')
 st.set_page_config(page_title="Car Sales Analysis Dashboard", page_icon="🚗", layout="wide",)
 
 # carregando e limpando base de dados
-df = pd.read_csv("db/car_sales.csv") 
+@st.cache_data
+def carregar_dados():
+    df = pd.read_csv("db/car_sales.csv") 
 
-df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
-df["Engine"] = df["Engine"].str.replace(r"[^\w\s]", "", regex=True)
+    df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
+    df["Engine"] = df["Engine"].str.replace(r"[^\w\s]", "", regex=True)
 
-df["Phone"] = df["Phone"].astype(str)
-df["Dealer_No"] = df["Dealer_No"].astype(str)
+    df["Phone"] = df["Phone"].astype(str)
+    df["Dealer_No"] = df["Dealer_No"].astype(str)
 
-text_columns = df.select_dtypes(include=["object"]).columns
-df[text_columns] = df[text_columns].apply(lambda x: x.str.strip())
+    text_columns = df.select_dtypes(include=["object"]).columns
+    df[text_columns] = df[text_columns].apply(lambda x: x.str.strip())
+
+    if "Latitude" not in df.columns or "Longitude" not in df.columns:
+        geolocator = Photon(user_agent="meu_app_vendas", timeout=10)
+        geocode = RateLimiter(geolocator.geocode, min_delay_seconds=1)
+
+        cache_coordenadas = {}
+
+        def obter_coordenadas(regiao):
+            if regiao in cache_coordenadas:
+                return cache_coordenadas[regiao]
+            try:
+                location = geocode(regiao)
+                if location:
+                    coordenadas = (location.latitude, location.longitude)
+                else:
+                    coordenadas = (None, None)
+            except Exception:
+                coordenadas = (None, None)
+            
+            cache_coordenadas[regiao] = coordenadas
+            return coordenadas
+
+        df["Latitude"], df["Longitude"] = zip(*df["Dealer_Region"].apply(obter_coordenadas))
+        df = df.dropna(subset=["Latitude", "Longitude"]) 
+    
+    return df
+
+df = carregar_dados()
 
 # Função para formatar números
 def format_number(num):
@@ -174,3 +207,23 @@ options = {
 }
 
 st_echarts(options=options, height="500px")
+
+view_state = pdk.ViewState(
+    latitude=df["Latitude"].mean(),  # Centraliza no meio dos pontos
+    longitude=df["Longitude"].mean(),
+    zoom=4
+)
+
+# Camada de pontos
+layer = pdk.Layer(
+    "ScatterplotLayer",
+    data=df,
+    get_position="[Longitude, Latitude]",
+    get_radius=30000,  # Tamanho do ponto no mapa
+    get_color=[255, 0, 0, 150],  # Cor (vermelho semi-transparente)
+    pickable=True
+)
+
+# Renderizar o mapa no Streamlit
+r = pdk.Deck(layers=[layer], initial_view_state=view_state, tooltip={"text": "{Dealer_Region}\nVendas: {Price ($)}"})
+st.pydeck_chart(r)
